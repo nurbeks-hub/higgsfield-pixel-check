@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Пиксельная сверка генераторов</title>
+<meta name="description" content="26 фотогенераторов Higgsfield, один промпт, по два дубля: что на самом деле лежит в пикселях.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: лабораторный протокол — вывод сверху, таблица лидеров, карта «мегапиксели × оценка», карточки моделей с форензикой, метод. Единая тёмная тема осциллографа, выбрана намеренно. */
+:root{
+  --bg:#0d0f12; --panel:#15181d; --panel2:#1b1f26; --line:#262b33; --fg:#e7e9ec; --dim:#8b929c; --accent:#ffb547;
+  --good:#5fd39a; --warn:#ffb547; --bad:#ff6b6b;
+  --display:"Unbounded","Arial Black",system-ui,sans-serif;
+  --body:"Golos Text",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--body);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+img{max-width:100%}
+[hidden]{display:none!important}
+.wrap{max-width:1440px;margin:0 auto;padding-inline:20px;padding-block:40px 80px;display:grid;gap:56px}
+.wrap>*{min-width:0}
+h1{font:700 clamp(30px,5vw,60px)/1.02 var(--display);margin:8px 0 0;letter-spacing:-.015em;text-wrap:balance}
+h2{font:600 clamp(18px,2.2vw,24px)/1.2 var(--display);margin:0 0 6px;text-wrap:balance}
+h3{font:600 15px/1.3 var(--body);margin:0}
+.eyebrow{font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.lead{color:var(--dim);max-width:72ch;margin:12px 0 0}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.dim{color:var(--dim)}
+section>p.lead:first-of-type{margin-top:0}
+.verdict{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px;margin-top:28px}
+.vcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;display:grid;gap:8px;align-content:start}
+.vcard .k{font:600 11px var(--mono);letter-spacing:.12em;text-transform:uppercase}
+.vcard b{font:600 19px/1.25 var(--display)}
+.vcard p{margin:0;color:var(--dim);font-size:14px}
+details.prompt{margin-top:18px;max-width:90ch;color:var(--dim);font-size:13.5px}
+details.prompt summary{cursor:pointer;color:var(--fg);font-weight:500}
+details.prompt pre{white-space:pre-wrap;font:12.5px/1.55 var(--mono);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;margin:10px 0 0}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+table.lb{border-collapse:collapse;width:100%;min-width:1060px}
+.lb th,.lb td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+.lb thead th{font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);background:var(--panel);position:sticky;top:0;cursor:pointer;user-select:none;white-space:nowrap}
+.lb thead th:hover{color:var(--fg)}
+.lb tbody tr{cursor:pointer}
+.lb tbody tr:hover{background:var(--panel2)}
+.lb .rk{font:700 18px var(--display);width:44px;color:var(--dim)}
+.lb .nm b{display:block;font-weight:600}
+.lb .nm span{font:11px var(--mono);color:var(--dim)}
+.lb .th2{display:flex;gap:4px}
+.lb .th2 img{width:88px;height:44px;object-fit:cover;border-radius:3px;display:block}
+.bar{position:relative;height:10px;background:var(--line);border-radius:5px;width:150px;overflow:hidden}
+.bar i{position:absolute;inset:0 auto 0 0;border-radius:5px}
+.sc{display:flex;align-items:center;gap:10px;font:600 15px var(--mono)}
+.sc small{font:400 11px var(--mono);color:var(--dim)}
+.heat{display:grid;grid-template-columns:repeat(7,26px);gap:3px}
+.heat div{height:22px;border-radius:3px}
+.heatlab{display:grid;grid-template-columns:repeat(7,26px);gap:3px;font:9px var(--mono);color:var(--dim);text-align:center;margin-top:3px}
+.mp{font:12px var(--mono);color:var(--dim);white-space:nowrap}
+.mp b{color:var(--fg);font-weight:600}
+.chart{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+svg text{fill:var(--dim);font:11px var(--mono)}
+.legend{display:flex;flex-wrap:wrap;gap:16px;font:12px var(--mono);color:var(--dim);margin-top:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.models{display:grid;gap:22px}
+.mcard{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;display:grid;gap:16px;scroll-margin-top:16px}
+.mhead{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 18px}
+.mhead .n{font:700 28px/1 var(--display);color:var(--dim)}
+.mhead h3{font:600 22px/1.15 var(--display)}
+.mhead .args{font:12px var(--mono);color:var(--dim)}
+.mhead .score{margin-left:auto;font:700 28px var(--display)}
+.takes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,600px),1fr));gap:18px}
+.take{display:grid;gap:10px;min-width:0}
+.take .big{width:100%;border-radius:6px;cursor:zoom-in;display:block;background:#000}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.tile{display:grid;gap:4px;min-width:0}
+.tile img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:4px;background:#000;display:block}
+.tile .px{image-rendering:pixelated}
+.tile span{font:10.5px var(--mono);color:var(--dim)}
+.metrics{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px 14px;font:12px var(--mono)}
+.metrics div{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dashed var(--line);padding-bottom:3px}
+.metrics div span{color:var(--dim)}
+.flags{display:flex;flex-wrap:wrap;gap:6px}
+.flag{font:12px var(--body);padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--fg)}
+.flag.b{border-color:color-mix(in srgb,var(--bad) 55%,transparent);color:var(--bad)}
+.flag.g{border-color:color-mix(in srgb,var(--good) 55%,transparent);color:var(--good)}
+.how{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:14px}
+.how .vcard p b{color:var(--fg);font-weight:500}
+.lightbox{position:fixed;inset:0;background:color-mix(in srgb,var(--bg) 94%,transparent);display:grid;place-items:center;z-index:50;padding:20px}
+.lightbox figure{margin:0;display:grid;gap:10px;max-width:100%;max-height:100%;justify-items:center}
+.lightbox img{image-rendering:pixelated;width:min(1024px,92vw);max-height:80vh;object-fit:contain;border:1px solid var(--line)}
+.lightbox figcaption{font:12px var(--mono);color:var(--dim);text-align:center}
+.lightbox button{font:600 13px var(--body);background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer}
+button:focus-visible,tr:focus-visible,img:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+footer{color:var(--dim);font-size:13px}
+@media (max-width:640px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.mhead .score{margin-left:0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Higgsfield · 26 фотогенераторов · 52 кадра · 7 октября 2026</div>
+  <h1>Пиксельная сверка генераторов</h1>
+  <p class="lead">Один и тот же промпт (задний двор дома в Огайо, пасмурно, Portra 400) прогнан через каждый фотогенератор Higgsfield на максимальных настройках, по два дубля, в 21:9 или 16:9, если 21:9 нет. Здесь оценивается не красота и не композиция, а то, что лежит в самих пикселях: сколько в них настоящей информации, нет ли сетки декодера, апскейла, пересвета, пластика и залитого цвета. Именно это потом унаследует видеомодель, если кадр пойдёт стартовым.</p>
+  <div class="verdict" id="verdict"></div>
+  <details class="prompt"><summary>Промпт целиком и настройки</summary><pre id="prompt"></pre></details>
+</header>
+
+<section>
+  <h2>Таблица лидеров</h2>
+  <p class="lead">Оценка 0–100 — средняя по двум дублям, после ± разброс между ними. Клетки справа показывают семь штрафов: чем краснее, тем сильнее дефект. Заголовки сортируют, клик по строке ведёт к карточке модели.</p>
+  <div class="scroll"><table class="lb" id="lb"></table></div>
+</section>
+
+<section class="chart">
+  <h2>Реальные мегапиксели против оценки</h2>
+  <p class="lead" style="margin-top:0">По горизонтали реальные мегапиксели: сколько информации переживает сжатие и обратное растяжение. Это не размер файла. По вертикали оценка структуры. Хорошо, когда точка правее и выше. Маленькая точка — заявленный размер файла, линия ведёт к реальному.</p>
+  <svg id="scatter" viewBox="0 0 1000 470" width="100%" role="img" aria-label="Диаграмма: реальные мегапиксели против оценки"></svg>
+  <div class="legend" id="slegend"></div>
+</section>
+
+<section>
+  <h2>Модели по порядку</h2>
+  <p class="lead" style="margin-top:0">Клик по кадру откроет нативный кроп 512×512 из центра. Плитки слева направо: макро 32×32 пикселя, скелет (кадр минус размытие), спектр Фурье скелета, автокорреляция.</p>
+  <div class="models" id="models"></div>
+</section>
+
+<section>
+  <h2>Как это посчитано</h2>
+  <div class="how" id="how"></div>
+</section>
+
+<footer id="foot"></footer>
+</div>
+
+<div class="lightbox" id="lbx" hidden>
+  <figure><img id="lbimg" alt=""><figcaption id="lbcap"></figcaption><button id="lbclose" type="button">Закрыть</button></figure>
+</div>
+
+<script>
+const PROMPT_ARGS = "Генераторы и параметры:\n";
+const FAM = {gpt:'#6cb6ff',nano:'#ffd36b',seed:'#5fd39a',flux:'#c39bff',soul:'#ff6fae',other:'#ff8f6b'};
+const fam = k => k.startsWith('gpt')||k.startsWith('openai')?'gpt':k.startsWith('nano')?'nano':k.startsWith('seed')?'seed':k.startsWith('flux')?'flux':(k.includes('soul')||k.startsWith('cinematic'))?'soul':'other';
+const FAMNAME = {gpt:'OpenAI',nano:'Google Nano Banana',seed:'ByteDance Seedream',flux:'Black Forest FLUX',soul:'Higgsfield Soul / Cinematic',other:'Grok, Kling, Ideogram, Recraft, Z'};
+const PEN = [['up','Апскейл'],['res','Мало Мп'],['grid','Сетка'],['alias','Алиасинг'],['noise','Шум'],['clip','Пересвет'],['chan','Цвет залит']];
+const heatCol = v => v>=.66?'var(--bad)':v>=.33?'var(--warn)':v>=.1?'#7d7350':'#2c3a33';
+const scoreCol = s => s>=80?'var(--good)':s>=65?'var(--warn)':'var(--bad)';
+const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+fetch('data.json').then(r=>r.json()).then(D=>{
+  const I = Object.fromEntries(D.images.map(r=>[r.base,r]));
+  const M = D.models;
+  document.getElementById('prompt').textContent = D.prompt + "\n\n" + PROMPT_ARGS + M.map(m=>`${m.key}: ${m.args}`).join('\n');
+
+  // verdict
+  const top = M[0], second = M[1];
+  const best4k = [...M].sort((a,b)=>b.eff-a.eff)[0];
+  const PN={up:'апскейл',res:'мало пикселей',grid:'сетка декодера',alias:'алиасинг',noise:'шум/пластик',clip:'пересвет',chan:'залитый цвет'};
+  const worstPen=m=>Object.entries(m.pen).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([k])=>PN[k]).join(' и ');
+  const worst = M[M.length-1];
+  const V = [
+    ['var(--good)','Лучшая структура пикселя', `${top.name} · ${top.score}`, ''],
+    ['var(--accent)','Больше всего реальной детализации', `${best4k.name} · ${best4k.eff} Мп`, `Самый плотный по реальной информации: каждый пиксель свой. Оценка ${best4k.score}, её тянут вниз ${worstPen(best4k)}.`],
+    ['var(--bad)','Где больше всего слопа в пикселях', `${worst.name} · ${worst.score}`, `Главные проблемы: ${worstPen(worst)}. Как стартовый кадр для видео передаст всё это дальше.`]
+  ];
+  V[0][3] = (top.pen.chan<.3?'Цветное зерно с независимыми каналами, как у сенсора. ':'')+(top.pen.up<.1?'Нет апскейла, ':'')+(top.pen.clip<.1?'нет пересвета. ':'')+`Второе место — ${second.name} (${second.score}).`;
+  document.getElementById('verdict').innerHTML = V.map(([c,k,b,p])=>`<div class="vcard" style="border-top:3px solid ${c}"><div class="k" style="color:${c}">${k}</div><b>${esc(b)}</b><p>${p}</p></div>`).join('');
+
+  // leaderboard
+  let sortKey='score', dir=-1;
+  const cols = [['rank','#'],['name','Модель'],['thumbs','Дубли'],['score','Оценка'],['eff','Реальные Мп'],['pen','Штрафы']];
+  function renderLB(){
+    const rows = M.map((m,i)=>({...m,rank:i+1}));
+    if(sortKey!=='rank'&&sortKey!=='thumbs'&&sortKey!=='pen') rows.sort((a,b)=> (a[sortKey]>b[sortKey]?1:-1)*dir);
+    if(sortKey==='rank') rows.sort((a,b)=>(a.rank-b.rank)*-dir);
+    const head = `<thead><tr>${cols.map(([k,t])=>`<th data-k="${k}">${t}${k===sortKey?(dir<0?' ↓':' ↑'):''}</th>`).join('')}</tr></thead>`;
+    const body = rows.map(m=>`<tr tabindex="0" data-go="${m.key}">
+      <td class="rk">${m.rank}</td>
+      <td class="nm"><b>${esc(m.name)}</b><span>${esc(m.args)}</span></td>
+      <td><div class="th2">${m.takes.map(t=>`<img loading="lazy" src="img/${t}_thumb.jpg" alt="">`).join('')}</div></td>
+      <td><div class="sc"><div class="bar"><i style="width:${m.score}%;background:${scoreCol(m.score)}"></i></div>${m.score}<small>±${m.spread}</small></div></td>
+      <td class="mp"><b>${m.eff}</b> из ${(m.w*m.h/1e6).toFixed(1)}<br>${m.w}×${m.h}</td>
+      <td><div class="heat">${PEN.map(([k,t])=>`<div title="${t}: ${Math.round(m.pen[k]*100)}%" style="background:${heatCol(m.pen[k])}"></div>`).join('')}</div><div class="heatlab">${PEN.map(([k,t])=>`<span>${t.slice(0,4)}</span>`).join('')}</div></td></tr>`).join('');
+    const lb = document.getElementById('lb'); lb.innerHTML = head + '<tbody>'+body+'</tbody>';
+    lb.querySelectorAll('th').forEach(th=>th.onclick=()=>{const k=th.dataset.k; if(k===sortKey) dir*=-1; else {sortKey=k; dir=(k==='name'?1:-1)} renderLB()});
+    lb.querySelectorAll('tbody tr').forEach(tr=>{const go=()=>document.getElementById('m-'+tr.dataset.go).scrollIntoView({behavior:'smooth'}); tr.onclick=go; tr.onkeydown=e=>{if(e.key==='Enter')go()}});
+  }
+  renderLB();
+
+  // scatter
+  (()=>{
+    const el=document.getElementById('scatter'), W=1000,H=470,L=60,R=20,T=16,B=46;
+    const xs=[.5,1,2,4,8,16,32], lx=v=>L+(Math.log2(v)-Math.log2(.5))/(Math.log2(32)-Math.log2(.5))*(W-L-R);
+    const ys=[20,40,60,80,100], ly=v=>T+(1-(v-20)/80)*(H-T-B);
+    let s='';
+    ys.forEach(v=>s+=`<line x1="${L}" x2="${W-R}" y1="${ly(v)}" y2="${ly(v)}" stroke="var(--line)"/><text x="${L-8}" y="${ly(v)+4}" text-anchor="end">${v}</text>`);
+    xs.forEach(v=>s+=`<line y1="${T}" y2="${H-B}" x1="${lx(v)}" x2="${lx(v)}" stroke="var(--line)" stroke-dasharray="2 4"/><text x="${lx(v)}" y="${H-B+18}" text-anchor="middle">${v} Мп</text>`);
+    s+=`<text x="${W-R}" y="${H-6}" text-anchor="end">реальные мегапиксели (лог. шкала)</text><text x="${L}" y="${T-4}" text-anchor="start">оценка</text>`;
+    const pts=M.map(m=>({m,x:lx(m.eff),x0:lx(m.w*m.h/1e6),y:ly(m.score)}));
+    pts.forEach(p=>{const c=FAM[fam(p.m.key)]; if(Math.abs(p.x0-p.x)>4) s+=`<line x1="${p.x0}" x2="${p.x}" y1="${p.y}" y2="${p.y}" stroke="${c}" stroke-opacity=".45" stroke-dasharray="3 3"/><circle cx="${p.x0}" cy="${p.y}" r="3" fill="${c}" fill-opacity=".5"/>`});
+    // label placement: avoid overlaps greedily
+    const placed=[];
+    pts.sort((a,b)=>b.m.score-a.m.score).forEach(p=>{const c=FAM[fam(p.m.key)];
+      s+=`<circle cx="${p.x}" cy="${p.y}" r="6.5" fill="${c}" stroke="var(--bg)" stroke-width="1.5"><title>${esc(p.m.name)}: ${p.m.score}, ${p.m.eff} Мп</title></circle>`;
+      const w=p.m.name.length*6.4+4; let best=null;
+      for(const [dx,dy,anc] of [[10,4,'start'],[-10,4,'end'],[10,-10,'start'],[10,16,'start'],[-10,-10,'end'],[-10,16,'end']]){
+        const x0=anc==='start'?p.x+dx:p.x+dx-w, y0=p.y+dy-10, box=[x0,y0,x0+w,y0+13];
+        if(box[0]<L||box[2]>W-R||box[1]<T) continue;
+        if(!placed.some(q=>!(box[2]<q[0]||box[0]>q[2]||box[3]<q[1]||box[1]>q[3]))){best=[dx,dy,anc,box];break}}
+      if(best){placed.push(best[3]); s+=`<text x="${p.x+best[0]}" y="${p.y+best[1]}" text-anchor="${best[2]}" style="fill:var(--fg);font-size:11px">${esc(p.m.name)}</text>`}
+    });
+    el.innerHTML=s;
+    document.getElementById('slegend').innerHTML=Object.keys(FAM).map(k=>`<span><i style="background:${FAM[k]}"></i>${FAMNAME[k]}</span>`).join('');
+  })();
+
+  // model cards
+  const flagCls = f => /цветное зерно/.test(f)?'g':/апскейл|сетка с шагом|алиасинг|пластик|выбито|мало пикселей|очень сильное/.test(f)?'b':'';
+  document.getElementById('models').innerHTML = M.map((m,i)=>`<article class="mcard" id="m-${m.key}">
+    <div class="mhead"><span class="n">${i+1}</span><h3>${esc(m.name)}</h3><span class="args">${esc(m.key)} · ${esc(m.args)}</span><span class="score" style="color:${scoreCol(m.score)}">${m.score}</span></div>
+    <div class="takes">${m.takes.map((t,j)=>{const r=I[t]; return `<div class="take">
+      <img class="big" loading="lazy" src="img/${t}_thumb.jpg" alt="${esc(m.name)}, дубль ${j+1}" data-crop="img/${t}_crop.png" data-cap="${esc(m.name)} · дубль ${j+1} · нативный кроп 512×512 из ${r.w}×${r.h}" tabindex="0">
+      <div class="tiles">
+        <div class="tile"><img class="px" loading="lazy" src="img/${t}_macro.png" alt=""><span>макро 32×32</span></div>
+        <div class="tile"><img loading="lazy" src="img/${t}_resid.png" alt=""><span>скелет ×12</span></div>
+        <div class="tile"><img loading="lazy" src="img/${t}_fft.png" alt=""><span>спектр</span></div>
+        <div class="tile"><img class="px" loading="lazy" src="img/${t}_acorr.png" alt=""><span>автокорр. ${r.ac1}→${r.ac2}</span></div>
+      </div>
+      <div class="metrics">
+        <div><span>дубль ${j+1}</span><b>${r.score}</b></div>
+        <div><span>реально Мп</span><b>${r.eff}</b></div>
+        <div><span>сетка 2/4/8 px</span><b>${r.grid['2']}/${r.grid['4']}/${r.grid['8']}</b></div>
+        <div><span>пики-алиасы</span><b>${r.spikes}</b></div>
+        <div><span>шум на ровном σ</span><b>${r.flat_noise}</b></div>
+        <div><span>белый 255</span><b>${r.clipW}%</b></div>
+        <div><span>сцепка RG/BG</span><b>${r.crg}/${r.cbg}</b></div>
+        <div><span>файл</span><b>${r.mb} МБ${r.alpha?' · α':''}</b></div>
+      </div>
+      <div class="flags">${(r.flags.length?r.flags:['чистая структура без явных дефектов']).map(f=>`<span class="flag ${r.flags.length?flagCls(f):'g'}">${esc(f)}</span>`).join('')}</div>
+    </div>`}).join('')}</div>
+  </article>`).join('');
+
+  // lightbox
+  const lbx=document.getElementById('lbx'), lbimg=document.getElementById('lbimg');
+  const open=el=>{lbimg.src=el.dataset.crop; document.getElementById('lbcap').textContent=el.dataset.cap; lbx.hidden=false; document.getElementById('lbclose').focus()};
+  document.querySelectorAll('.take .big').forEach(el=>{el.onclick=()=>open(el); el.onkeydown=e=>{if(e.key==='Enter')open(el)}});
+  const close=()=>{lbx.hidden=true; lbimg.removeAttribute('src')};
+  document.getElementById('lbclose').onclick=close; lbx.onclick=e=>{if(e.target===lbx)close()}; document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+
+  // method
+  const w=D.weights;
+  const HOW=[
+    ['Реальные мегапиксели',`Центр кадра 1536×1536 сжимается в 1,25–4 раза и растягивается обратно. Если потеря меньше 1,2 уровня яркости, значит в этих пикселях не было информации и кадр растянут. <b>Штраф «апскейл» (${w.up*100}%)</b> добавляет к этому автокорреляцию на сдвиге 2 px. <b>«Мало Мп» (${w.res*100}%)</b> начисляется, если реально меньше 2,5 Мп.`],
+    ['Сетка декодера',`Спектр Фурье остатка (кадр минус гауссово размытие σ=1,2), усреднённый по тайлам 512×512. Смотрим, насколько энергия на периодах 2, 3, 4, 8 и 16 px выше соседних частот. Больше 6 dB означает регулярный узор, 30 dB — шахматку, которая видна при увеличении. <b>Вес ${w.grid*100}%.</b>`],
+    ['Алиасинг',`Сколько в спектре изолированных точек, которые больше чем на 12 dB выше соседей (вне осей). Это следы растяжения, шарпа и повторяющихся текстур. <b>Вес ${w.alias*100}%.</b>`],
+    ['Шум',`Медианная амплитуда остатка на самых ровных 20% блоков 8×8. Меньше 0,4 означает пластик без единой живой точки, больше 4 — зерно намного сильнее заказанного Portra 400. <b>Вес ${w.noise*100}%.</b>`],
+    ['Пересвет',`Доля пикселей, где все три канала ровно 255. Информация там потеряна безвозвратно, видеомодель получит плоскую белую дыру. <b>Вес ${w.clip*100}%.</b>`],
+    ['Цвет залит',`Корреляция мелкой детали между каналами R–G и B–G. Около 1,0 значит, что цвет залит гладко, а детали есть только в яркости: типичный след латентного декодера. У сенсора и плёнки каналы шумят частично независимо. <b>Вес ${w.chan*100}%.</b>`],
+    ['Ограничения',`Это оценка структуры пикселя, а не композиции, анатомии сцены или следования промпту. Два дубля на модель — маленькая выборка, поэтому смотрите на разброс ±. Все файлы скачаны с Higgsfield без пересжатия (PNG), анализ сделан на numpy без нейросетей.`]
+  ];
+  document.getElementById('how').innerHTML=HOW.map(([h,p])=>`<div class="vcard"><h3>${h}</h3><p>${p}</p></div>`).join('');
+  document.getElementById('foot').textContent = `Сгенерировано ${D.images.length} кадров в ${M.length} конфигурациях. ${D.note||''}`;
+}).catch(e=>{document.getElementById('verdict').innerHTML=`<div class="vcard"><b>Не удалось загрузить data.json</b><p>${esc(e.message)}. Откройте страницу через веб-сервер, а не как файл.</p></div>`});
+</script>
+</body>
+</html>

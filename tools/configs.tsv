@@ -1,0 +1,27 @@
+flux_3_image	--aspect_ratio 21:9 --resolution 4k
+flux_2	--aspect_ratio 16:9 --resolution 2k --variant max
+flux_kontext	--aspect_ratio 16:9
+gpt_image_2	--aspect_ratio 21:9 --resolution 4k --quality high
+gpt_image_2_5	--aspect_ratio 21:9 --resolution 4k --quality max --variant flare
+gpt_image_2_5@sunburst	--aspect_ratio 21:9 --resolution 4k --quality max --variant sunburst
+grok_image	--aspect_ratio 16:9 --resolution 2k --mode quality
+grok_image_2_0	--aspect_ratio 16:9 --resolution 2k --quality medium
+text2image_soul_v2	--aspect_ratio 16:9 --quality 2k
+ideogram_4_5	--aspect_ratio 16:9 --resolution 2k --quality high --magic_prompt off
+kling_omni_image	--aspect_ratio 21:9 --resolution 2k
+nano_banana	--aspect_ratio 21:9
+nano_banana_flash	--aspect_ratio 21:9 --resolution 4k
+nano_banana_2_lite	--aspect_ratio 21:9 --resolution 1k --thinking HIGH
+nano_banana_2_1	--aspect_ratio 21:9 --resolution 4k --thinking_level high
+nano_banana_pro	--aspect_ratio 21:9 --resolution 4k
+openai_hazel	--aspect_ratio 3:2 --quality high
+recraft_v4_1	--aspect_ratio 16:9 --resolution 2k --model_type standard
+seedream_v4_5	--aspect_ratio 21:9 --quality high
+seedream_5_0_flash	--aspect_ratio 21:9 --resolution 2k
+seedream_v5_lite	--aspect_ratio 21:9 --quality high
+seedream_v5_pro	--aspect_ratio 21:9 --resolution 2k
+soul_cinematic	--aspect_ratio 21:9 --quality 2k
+soul_location	--aspect_ratio 21:9
+z_image	--aspect_ratio 16:9
+cinematic_studio_2_5	--aspect_ratio 21:9 --resolution 4k
+cinematic_studio_soul_location	--aspect_ratio 21:9
